@@ -1,0 +1,217 @@
+{
+    "modules": [
+        {
+            "id": "ce6651c1-c23f-4c4a-b03c-3d49f70831aa",
+            "type": "SetLoggingBehavior",
+            "branches": [
+                {
+                    "condition": "Success",
+                    "transition": "2725df5b-ff85-4d26-bed7-05b73fd348f9"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "LoggingBehavior",
+                    "value": "Enable"
+                }
+            ],
+            "metadata": {
+                "position": {
+                    "x": 173,
+                    "y": 22
+                }
+            }
+        },
+        {
+            "id": "2725df5b-ff85-4d26-bed7-05b73fd348f9",
+            "type": "GetUserInput",
+            "branches": [
+                {
+                    "condition": "NoMatch",
+                    "transition": "378f4d9d-613e-43ae-b033-ceb27e1da984"
+                },
+                {
+                    "condition": "Error",
+                    "transition": "01119136-be10-4a35-aeab-606f0eca132f"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "Text",
+                    "value": "Welcome to loan services! How can I help?",
+                    "namespace": null
+                },
+                {
+                    "name": "TextToSpeechType",
+                    "value": "text"
+                },
+                {
+                    "name": "BotAliasArn",
+                    "value": "arn:aws:lex:us-east-1:123456789012:bot-alias/A1B2C3D4E5/E5D4C3B2A1",
+                    "namespace": null
+                },
+                {
+                    "name": "LexVersion",
+                    "value": "V2"
+                }
+            ],
+            "metadata": {
+                "position": {
+                    "x": 130,
+                    "y": 252
+                },
+                "conditionMetadata": [],
+                "useDynamic": false,
+                "dynamicMetadata": {},
+                "useLexBotDropdown": true,
+                "useDynamicLexBotArn": false,
+                "lexV2BotName": "Loan_App_Bot",
+                "lexV2BotAliasName": "dev"
+            },
+            "target": "Lex"
+        },
+        {
+            "id": "01119136-be10-4a35-aeab-606f0eca132f",
+            "type": "PlayPrompt",
+            "branches": [
+                {
+                    "condition": "Success",
+                    "transition": "6923aec3-6030-4668-a1c5-a2a148a26ef9"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "Text",
+                    "value": "Apologies, but something went wrong.",
+                    "namespace": null
+                },
+                {
+                    "name": "TextToSpeechType",
+                    "value": "text"
+                }
+            ],
+            "metadata": {
+                "position": {
+                    "x": 466,
+                    "y": 267
+                },
+                "useDynamic": false
+            }
+        },
+        {
+            "id": "378f4d9d-613e-43ae-b033-ceb27e1da984",
+            "type": "Wait",
+            "branches": [
+                {
+                    "condition": "Timeout",
+                    "transition": "12162741-b375-49e7-b964-224c88e6a7c1"
+                },
+                {
+                    "condition": "Error",
+                    "transition": "6923aec3-6030-4668-a1c5-a2a148a26ef9"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "TimeoutSeconds",
+                    "value": "3"
+                }
+            ],
+            "metadata": {
+                "position": {
+                    "x": 445,
+                    "y": 21
+                },
+                "useDynamic": false,
+                "timeoutUnit": {
+                    "display": "Seconds",
+                    "value": "second"
+                }
+            }
+        },
+        {
+            "id": "6923aec3-6030-4668-a1c5-a2a148a26ef9",
+            "type": "Disconnect",
+            "branches": [],
+            "parameters": [],
+            "metadata": {
+                "position": {
+                    "x": 728,
+                    "y": 417
+                }
+            }
+        },
+        {
+            "id": "12162741-b375-49e7-b964-224c88e6a7c1",
+            "type": "SetQueue",
+            "branches": [
+                {
+                    "condition": "Success",
+                    "transition": "ffe4a741-c1db-4774-9d9e-48b32c50f031"
+                },
+                {
+                    "condition": "Error",
+                    "transition": "6923aec3-6030-4668-a1c5-a2a148a26ef9"
+                }
+            ],
+            "parameters": [
+                {
+                    "name": "Queue",
+                    "value": "arn:aws:connect:us-east-1:123456789012:instance/12345678-1234-1234-1234-123456789012/queue/12345678-1234-1234-1234-123456789012",
+                    "namespace": null,
+                    "resourceName": "BasicQueue"
+                }
+            ],
+            "metadata": {
+                "position": {
+                    "x": 720,
+                    "y": 13
+                },
+                "useDynamic": false,
+                "queue": {
+                    "id": "arn:aws:connect:us-east-1:123456789012:instance/12345678-1234-1234-1234-123456789012/queue/12345678-1234-1234-1234-123456789012",
+                    "text": "BasicQueue"
+                }
+            }
+        },
+        {
+            "id": "ffe4a741-c1db-4774-9d9e-48b32c50f031",
+            "type": "Transfer",
+            "branches": [
+                {
+                    "condition": "AtCapacity",
+                    "transition": "6923aec3-6030-4668-a1c5-a2a148a26ef9"
+                },
+                {
+                    "condition": "Error",
+                    "transition": "6923aec3-6030-4668-a1c5-a2a148a26ef9"
+                }
+            ],
+            "parameters": [],
+            "metadata": {
+                "position": {
+                    "x": 962,
+                    "y": 171
+                },
+                "useDynamic": false,
+                "queue": null
+            },
+            "target": "Queue"
+        }
+    ],
+    "version": "1",
+    "start": "ce6651c1-c23f-4c4a-b03c-3d49f70831aa",
+    "metadata": {
+        "entryPointPosition": {
+            "x": 15,
+            "y": 19
+        },
+        "snapToGrid": false,
+        "name": "Loan_App_Flow",
+        "description": null,
+        "type": "contactFlow",
+        "status": "published",
+        "hash": "291cff980bec75da4c139ea140790c83ec7804de904dd459ef0eb510e3b8463e"
+    },
+    "type": "contactFlow"
+}

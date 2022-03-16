@@ -1,0 +1,227 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+    <title>CloudBank</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8" />
+    <!-- <script src="amazon-connect-chat-interface.default.js"></script> -->
+    <style>
+        #webpack-dev-server-client-overlay {
+            display: none !important;
+        }
+
+        html {
+            font-size: 62.5%;
+        }
+
+        body {
+            margin: 0;
+            background-color: #ffffff;
+            font-size: 16px;
+            font-family: "Amazon Ember",Roboto,Arial,sans-serif;
+            color: #333;
+        }
+
+        #baseSite {
+            opacity: 0.3;
+            border: 0;
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+
+        main {
+           min-height: 1600px;
+        }
+
+        nav {
+            display:flex;
+            align-items: center;
+            padding: 0 4rem;
+            color: #002F6C;
+            box-shadow: 0 3px 15px rgb(57 63 72 / 10%);
+        }
+
+        nav img {
+            width: 40px;
+        }
+
+        nav h2 {
+            margin: 2rem 2rem 2rem 1rem;
+            font-weight: 800;
+        }
+
+        nav span {
+            margin-left: 4rem;
+            font-weight: bold;
+        }
+
+        section {
+           max-width:1280px;
+           margin-left: auto;
+           margin-right: auto; 
+           margin-top: 4rem;
+           padding: 4rem;
+        }
+
+        .split {
+            display:flex;
+        }
+
+        .split > div {
+            flex: 0.7;
+        }
+
+        .split .left {
+            margin-top:8rem;
+            max-width: 500px;
+        }
+
+        section h1 {
+            font-weight: 800;
+            font-size: 5rem;
+            color: #002F6C;
+        }
+
+        section h6 {
+            font-weight: normal;
+            font-size: 2rem;
+            line-height: 1.7;
+            margin-top: -3rem;
+        }
+
+        .hero {
+            position: relative;
+            margin-left: 5rem;
+        }
+
+        .hero div:nth-child(1) {
+            width: 300px;
+            height: 300px;
+            background-color: #AEEFDF;
+            border-radius: 50%;
+            position: absolute;
+            bottom: -8rem;
+            left: -2rem;
+            z-index: -1;
+        }
+
+        .hero div:nth-child(2) {
+            width: 500px;
+            height: 500px;
+            background-color: #BFB8F1;
+            border-radius: 50%;
+            position: absolute;
+            top: -2rem;
+            right: 4rem;
+            z-index: -2;
+        }
+
+        .hero img {
+            width: 600px;
+            height: 600px;
+            object-fit: cover;
+            border-radius: 50%;
+            position: absolute;
+            top: -4rem;
+        }
+
+    </style>
+</head>
+
+<body>
+    <!-- A site to load as the background, to show how the chat would look on top of an existing site. This will only work if the site allows itself to be iframed -->
+    <iframe id="baseSite" src=""></iframe>
+    <main>
+        <nav>
+            <img src="data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' height='24px' viewBox='0 0 24 24' width='24px' fill='%23AEEFDF'%3e%3cpath d='M0 0h24v24H0V0z' fill='none'/%3e%3cpath d='M13 9.18c.85.3 1.51.97 1.82 1.82h7.13c-.47-4.72-4.23-8.48-8.95-8.95v7.13zm-2 5.64C9.84 14.4 9 13.3 9 12c0-1.3.84-2.4 2-2.82V2.05c-5.05.5-9 4.76-9 9.95 0 5.19 3.95 9.45 9 9.95v-7.13zM14.82 13c-.3.85-.97 1.51-1.82 1.82v7.13c4.72-.47 8.48-4.23 8.95-8.95h-7.13z'/%3e%3c/svg%3e"/> 
+            <h2>CloudBank</h2>
+            <div>
+                <span>Products</span>
+                <span>Loans</span>
+                <span>FAQs</span>
+                <span>Contact Us</span>
+            </div>
+        </nav>
+        <section class="split">
+            <div class="left">
+                <h1>Hassle-free Loans. <br/>Born in the Cloud.</h1>
+                <h6>Experience hassle-free banking today. Upload your W2 and get a decision in minutes. A human is always on hand if you need guidance.</h6>
+            </div>
+            <div class="hero">
+                <div></div>
+                <div></div>
+                <img src="https://images.unsplash.com/photo-1485217988980-11786ced9454?ixlib=rb-1.2.1&ixid=MnwxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8&auto=format&fit=crop&w=1470&q=80"/>
+            </div>
+        </section>
+    </main>
+    <script>
+        // Helper function to extract query string params to initiate the chat properties via query string (e.g. contactId)
+        function getUrlParameter(name) {
+            name = name.replace(/[\[]/, '\\[').replace(/[\]]/, '\\]');
+            var regex = new RegExp('[\\?&]' + name + '=([^&#]*)');
+            var results = regex.exec(location.search);
+            return results === null ? '' : decodeURIComponent(results[1].replace(/\+/g, ' '));
+        };
+
+        // Trigger chat initialization
+        window.addEventListener('DOMContentLoaded', (event) => {
+           window.startChat();
+        });
+
+        window.startChat = () => {
+            const cf_apiId = "${apiId}";
+            const cf_instanceId = "${instanceId}";
+            const cf_contactFlowId = "${contactFlowId}";
+            const cf_region = "${region}";
+            const cf_enableAttachments= "${enableAttachments}";
+            const customerName = "Powder";
+            
+            let contactFlowId, instanceId, apiGatewayEndpoint, timeoutEnabled = false, isAttachmentsEnabled = true;
+
+            // check query params
+            timeoutEnabled = getUrlParameter('timeoutEnabled')=='true'; // enable/disable session timeout on the front-end
+            window._timeoutValueInSecs = getUrlParameter('timeoutValueInSecs')?parseInt(getUrlParameter('timeoutValueInSecs')):30;
+            apiGatewayEndpoint = `https://${cf_apiId}.execute-api.${cf_region}.amazonaws.com/prod`;
+
+            // TODO: Pass in as parameters to React vs leveraging global variables
+            window._apigwUrl = apiGatewayEndpoint;
+            window._isSessionTimerEnabled = timeoutEnabled;
+
+            // Initiate chat (this renders the button but does not call Connect/backend)
+            connect.ChatInterface.init({
+                containerId: 'amzn-connect-root',
+                showChatExpanded: false, // show the chat expanded vs the user having to click the button, helpful during debugging
+                themeConfig: {
+                    color: {
+                        primary: '#002F6C', // the primary color to use for the UI
+                    }
+                },
+                headerConfig: {
+                    title: 'CloudBank', // show in the chat UI header
+                    subtitle: 'Virtual Concierge',
+                    brandLogoUrl: "data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' height='16px' viewBox='0 0 24 24' width='16px' fill='%23ffffff'%3e%3cpath d='M0 0h24v24H0V0z' fill='none'/%3e%3cpath d='M13 9.18c.85.3 1.51.97 1.82 1.82h7.13c-.47-4.72-4.23-8.48-8.95-8.95v7.13zm-2 5.64C9.84 14.4 9 13.3 9 12c0-1.3.84-2.4 2-2.82V2.05c-5.05.5-9 4.76-9 9.95 0 5.19 3.95 9.45 9 9.95v-7.13zM14.82 13c-.3.85-.97 1.51-1.82 1.82v7.13c4.72-.47 8.48-4.23 8.95-8.95h-7.13z'/%3e%3c/svg%3e"
+                },
+                featurePermissions: {
+                    "ATTACHMENTS": cf_enableAttachments // enable/disable attachments
+                },
+                name: customerName,
+                region: cf_region,
+                apiGatewayEndpoint: apiGatewayEndpoint,
+                contactAttributes: JSON.stringify({
+                    "customerName": customerName
+                }),
+                contactFlowId: cf_contactFlowId,
+                instanceId: cf_instanceId
+            });
+        }
+    </script>
+
+<script src="/js/amazon-connect-chat-interface.js"></script></body>
+
+</html>

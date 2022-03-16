@@ -1,0 +1,796 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+
+Description: >
+  Customer chat solution for Amazon Connect with Lex session integration (blog)
+
+Parameters:
+  WebsiteS3BucketName:
+    Type: String
+    Default: "blog-website-bucket"
+    Description: >
+      Enter the (globally unique) name you would like to use to create the Amazon S3 bucket where we will store the website contents.
+      This template will append your AWS account ID to the bucket name.
+    AllowedPattern: '(?=^.{3,51}$)(?!^(\d+\.)+\d+$)(^(([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])\.)*([a-z0-9]|[a-z0-9][a-z0-9\-]*[a-z0-9])$)'
+  ConnectFlowId:
+    Type: String
+    Default: 12345678-1234-1234-1234-123456789012
+    Description: The contact flow id that the customer will interact with while chatting. This should be the id of the Basic Contact Flow you uploaded.
+    AllowedPattern: '\w{8}-\w{4}-\w{4}-\w{4}-\w{12}'
+  ConnectInstanceId:
+    Type: String
+    Default: 12345678-1234-1234-1234-123456789012
+    Description: The instance id of the Amazon Connect instance that the customer will interact with while chatting. You can find this in the Amazon Connect console when viewing your instance details.
+    AllowedPattern: '\w{8}-\w{4}-\w{4}-\w{4}-\w{12}'
+  cloudFrontPriceClass:
+    Type: String
+    Default: PriceClass_100
+    AllowedValues:
+      - PriceClass_100
+      - PriceClass_200
+      - PriceClass_All
+    ConstraintDescription: "Allowed Price Classes PriceClass_100 PriceClass_200 and PriceClass_All"
+    Description: Specify the CloudFront price class. See https://aws.amazon.com/cloudfront/pricing/ for a description of each price class.
+  LexBotName:
+    Type: String
+    Default: "Loan_App_Bot"
+    Description: >
+      Lex Bot Name. Must be unique in the account region.
+  
+Resources:
+  ### Website S3 Bucket###
+  CreateWebsiteS3Bucket:
+    Type: 'AWS::S3::Bucket'
+    Properties:
+      BucketName: !Sub ${WebsiteS3BucketName}-${AWS::AccountId}
+      AccessControl: LogDeliveryWrite
+      LoggingConfiguration:
+        DestinationBucketName: !Sub ${WebsiteS3BucketName}-${AWS::AccountId}
+        LogFilePrefix: 'logs/'
+      PublicAccessBlockConfiguration:
+        BlockPublicAcls: True
+        BlockPublicPolicy: True
+        IgnorePublicAcls: True
+        RestrictPublicBuckets: True
+      CorsConfiguration:
+        CorsRules:
+          -
+            AllowedHeaders:
+              - "*"
+            AllowedMethods:
+              - GET
+              - POST
+            AllowedOrigins:
+              - "*"
+            MaxAge: 600
+
+  s3BucketPolicy:
+    Type: AWS::S3::BucketPolicy
+    Properties:
+      Bucket: !Ref CreateWebsiteS3Bucket
+      PolicyDocument:
+        Statement:
+          - Action:
+              - "s3:GetObject"
+            Effect: "Allow"
+            Principal:
+              CanonicalUser:
+                Fn::GetAtt: [ CloudFrontDistributionAccessIdentity , S3CanonicalUserId ]
+            Resource:
+              !Sub ${CreateWebsiteS3Bucket.Arn}/*
+              
+  ### CloudFront ###
+  CloudFrontDistributionAccessIdentity:
+    Type: AWS::CloudFront::CloudFrontOriginAccessIdentity
+    Properties:
+      CloudFrontOriginAccessIdentityConfig:
+        Comment: 'CloudFront Origin Access ID for Amazon Connect Chat Bot'
+
+  CloudFrontDistribution:
+    Type: AWS::CloudFront::Distribution
+    Properties:
+      DistributionConfig:
+        Origins:
+          - DomainName:
+              !Join
+              - ''
+              - - !Ref CreateWebsiteS3Bucket
+                - .s3.amazonaws.com
+            Id: !Ref CreateWebsiteS3Bucket
+            OriginPath: /contents
+            S3OriginConfig:
+              OriginAccessIdentity:
+                !Join
+                - ''
+                - - 'origin-access-identity/cloudfront/'
+                  - !Ref CloudFrontDistributionAccessIdentity
+        Enabled: true
+        Logging:
+          Bucket: !GetAtt CreateWebsiteS3Bucket.DomainName
+          Prefix: 'logs/'
+          IncludeCookies: true
+        Comment: CloudFront for Connect Chat UI
+        DefaultRootObject: index.html
+        DefaultCacheBehavior:
+          AllowedMethods:
+            - DELETE
+            - GET
+            - HEAD
+            - OPTIONS
+            - PATCH
+            - POST
+            - PUT
+          TargetOriginId: !Ref CreateWebsiteS3Bucket
+          ForwardedValues:
+            QueryString: false
+            Cookies:
+              Forward: none
+          ViewerProtocolPolicy: redirect-to-https
+        PriceClass: !Ref cloudFrontPriceClass
+
+  ### API LAMBDA/ROLE ###
+  InitiateChatLambda:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Description:  AWS Lambda Function to initiate the chat with the end user
+      CodeUri: async-customer-chat/ 
+      Handler: "lambda_function.lambda_handler"
+      Role: !GetAtt InitiateChatLambdaExecutionRole.Arn
+      Runtime: "python3.9"
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          INSTANCE_ID: !Ref ConnectInstanceId
+          CONTACT_FLOW_ID: !Ref ConnectFlowId
+          CF_DISTRIBUTION: !GetAtt CloudFrontDistribution.DomainName
+
+
+  InitiateChatLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: initiate-chat-execution-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"
+              - Effect: "Allow"
+                Action:
+                  - "connect:StartChatContact"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}"
+                  - !Sub "arn:${AWS::Partition}:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}/*"
+
+  ### Lex Session LAMBDA/ROLE ###
+  LexSessionLambda:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Description:  AWS Lambda Function to manage session data for the Lex bot
+      CodeUri: lex-session-adapter/
+      Handler: "lambda_function.lambda_handler"
+      Role: !GetAtt LexSessionLambdaExecutionRole.Arn
+      Runtime: "python3.9"
+      MemorySize: 128
+      Timeout: 30
+      Environment:
+        Variables:
+          LEX_BOT_ID: !Ref LexBot
+          LEX_BOT_ALIAS_ID: !Select [0, !Split ["|", !Ref LexBotAlias]]
+      
+  LexSessionLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: lex-session-execution-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"
+              - Effect: "Allow"
+                Action:
+                  - "lex:PostContent"
+                  - "lex:PostText"
+                  - "lex:PutSession"
+                  - "lex:GetSession"
+                  - "lex:DeleteSession"
+                  - "lex:RecognizeText"
+                  - "lex:RecognizeUtterance"
+                  - "lex:StartConversation"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:lex:${AWS::Region}:${AWS::AccountId}:bot-alias/${LexBot}/*"
+
+  ### Lex Bot Lambda ###
+  LexBotLambda:
+    Type: "AWS::Serverless::Function"
+    Properties:
+      Description:  AWS Lambda Function for the Lex bot
+      CodeUri: app-bot-lambda/
+      Handler: "lambda_function.lambda_handler"
+      Role: !GetAtt LexBotLambdaExecutionRole.Arn
+      Runtime: "python3.9"
+      MemorySize: 128
+      Timeout: 30
+  
+  LexBotLambdaExecutionRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: lex-bot-execution-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"
+              - Effect: "Allow"
+                Action:
+                  - "textract:AnalyzeDocument"
+                Resource:
+                  - "*"
+
+  ### Custom helpers ###
+  CustomResourceHelper:
+    Type: AWS::Serverless::Function
+    Properties:
+      Description: Custom resources builder lambda
+      CodeUri: custom-resource-utils/
+      Handler: cr_helper.lambda_handler
+      MemorySize: 256
+      Role: !GetAtt CustomResourceHelperIamRole.Arn
+      Runtime: python3.9
+      Timeout: 300
+
+  CustomResourceHelperIamRole:
+    Type: "AWS::IAM::Role"
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: "Allow"
+            Principal:
+              Service:
+                - "lambda.amazonaws.com"
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: custom-resource-loggroup-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - 'logs:CreateLogGroup'
+                  - 'logs:CreateLogStream'
+                  - 'logs:PutLogEvents'
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:logs:${AWS::Region}:${AWS::AccountId}:log-group:/aws/lambda/*"
+        - PolicyName: custom-resource-connect-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "connect:AssociateBot"
+                  - "connect:DisassociateBot"
+                Resource:
+                  - !Sub "arn:${AWS::Partition}:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}"
+                  - !Sub "arn:${AWS::Partition}:connect:${AWS::Region}:${AWS::AccountId}:instance/${ConnectInstanceId}/*"
+              - Effect: "Allow"
+                Action:
+                  - "lex:ListBotAliases"
+                  - "lex:UpdateResourcePolicy"
+                  - "lex:DescribeResourcePolicy"
+                  - "lex:CreateResourcePolicy"
+                  - "lex:DescribeBotAlias"
+                Resource:
+                  - !GetAtt LexBotAlias.Arn
+                  - !GetAtt LexBot.Arn
+        - PolicyName: custom-resource-website-policy
+          PolicyDocument:
+            Version: "2012-10-17"
+            Statement:
+              - Effect: "Allow"
+                Action:
+                  - "s3:PutObject"
+                  - "s3:GetObject"
+                  - "s3:PutObjectAcl"
+                Resource:
+                  - !Sub ${CreateWebsiteS3Bucket.Arn}/*
+
+  ConfigureWebsite:
+    Type: Custom::ConfigWebsite
+    Properties:
+      customAction: configureWebsite
+      Version: 1.0
+      ServiceToken: !GetAtt CustomResourceHelper.Arn
+      Region: !Ref AWS::Region
+      destS3Bucket: !Ref CreateWebsiteS3Bucket
+      destS3KeyPrefix: contents/
+
+  ConfigureConnectBot:
+    Type: Custom::ConfigConnectBot
+    Properties:
+      customAction: configureConnectBot
+      Version: 1.0
+      ServiceToken: !GetAtt CustomResourceHelper.Arn
+      Region: !Ref AWS::Region
+      instanceId: !Ref ConnectInstanceId
+      flowId: !Ref ConnectFlowId
+      botAliasArn: !GetAtt LexBotAlias.Arn
+
+  ConfigureIndexFile:
+    Type: Custom::ConfigIndexFile
+    Properties:
+      customAction: configureIndexFile
+      Version: 1.0
+      ServiceToken: !GetAtt CustomResourceHelper.Arn
+      Region: !Ref AWS::Region
+      destS3Bucket: !Ref CreateWebsiteS3Bucket
+      destS3KeyPrefix: contents/
+      instanceId: !Ref ConnectInstanceId
+      flowId: !Ref ConnectFlowId
+      apId: !Ref ConnectChatBlogAPI
+      enableAttach: "true"
+
+  #### Lex Bot #####
+  LexBot:
+    Type: 'AWS::Lex::Bot'
+    Properties:
+      Name: !Sub ${LexBotName}
+      Description: "Lex bot for Connect Chat Blog"
+      RoleArn: !GetAtt LexBotRole.Arn
+      AutoBuildBotLocales: true
+      DataPrivacy:
+        ChildDirected: false
+      IdleSessionTTLInSeconds: 300
+      BotLocales: 
+        - LocaleId: en_US
+          Description: "US English locale"
+          NluConfidenceThreshold: 0.40
+          VoiceSettings:
+            VoiceId: "Joanna"
+          SlotTypes:
+            - Name: "loanType"
+              Description: "Loan Type"
+              SlotTypeValues:
+                - SampleValue:
+                   Value: auto
+                - SampleValue:
+                    Value: home
+                - SampleValue:
+                    Value: business
+              ValueSelectionSetting:
+                ResolutionStrategy: TOP_RESOLUTION
+            - Name: "fileUpload"
+              Description: "upload status"
+              SlotTypeValues:
+                - SampleValue:
+                   Value: cancel
+                - SampleValue:
+                   Value: uploaded
+              ValueSelectionSetting:
+                ResolutionStrategy: TOP_RESOLUTION
+          Intents:
+            - Name: "LoanAppIntent"
+              Description: "Processes loan applications"
+              DialogCodeHook: 
+                Enabled: true
+              FulfillmentCodeHook:
+                Enabled: true
+              SampleUtterances:
+                - Utterance: "loan"
+                - Utterance: "loan application"
+                - Utterance: "want loan"
+                - Utterance: "need loan"
+                - Utterance: "new loan"
+                - Utterance: "apply for loan"
+              SlotPriorities:
+                - Priority: 1
+                  SlotName: loanType
+                - Priority: 2
+                  SlotName: loanAmount
+                - Priority: 3
+                  SlotName: fileUpload
+              Slots:
+                - Name: "loanType"
+                  Description: "Loan type"
+                  SlotTypeName: "loanType"
+                  ValueElicitationSetting:
+                    SlotConstraint: "Required"
+                    PromptSpecification:
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "What type of loan do you need?"
+                      MaxRetries: 3
+                      AllowInterrupt: false
+                - Name: "loanAmount"
+                  Description: "Loan amount"
+                  SlotTypeName: "AMAZON.Number"
+                  ValueElicitationSetting:
+                    SlotConstraint: "Required"
+                    PromptSpecification:
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "How much do you want to borrow?"
+                      MaxRetries: 3
+                      AllowInterrupt: false
+                - Name: "fileUpload"
+                  Description: "file upload status"
+                  SlotTypeName: "fileUpload"
+                  ValueElicitationSetting:
+                    SlotConstraint: "Required"
+                    PromptSpecification:
+                      MessageGroupsList:
+                        - Message:
+                            PlainTextMessage:
+                              Value: "Upload a file."
+                      MaxRetries: 3
+                      AllowInterrupt: false           
+            - Name: "FallbackIntent"
+              Description: "Default intent when no other intent matches"
+              DialogCodeHook: 
+                Enabled: false
+              FulfillmentCodeHook:
+                Enabled: true
+              ParentIntentSignature: "AMAZON.FallbackIntent"
+
+  ##### Bot Version #####              
+  LexBotVersion:
+    Type: AWS::Lex::BotVersion
+    Properties:
+      BotId: !Ref LexBot
+      BotVersionLocaleSpecification:
+        - LocaleId: en_US
+          BotVersionLocaleDetails:
+            SourceBotVersion: DRAFT
+      Description: Bot Version
+
+  ##### Bot Alias #####
+  LexBotAlias:
+    Type: AWS::Lex::BotAlias
+    Properties:
+      BotId: !Ref LexBot
+      BotAliasName: "dev"
+      BotVersion: !GetAtt LexBotVersion.BotVersion
+      SentimentAnalysisSettings:
+        DetectSentiment: false
+      BotAliasLocaleSettings:
+        - LocaleId: en_US
+          BotAliasLocaleSetting:
+            Enabled: true
+            CodeHookSpecification: 
+              LambdaCodeHook:
+                CodeHookInterfaceVersion: "1.0"
+                LambdaArn: !GetAtt LexBotLambda.Arn
+
+  ##### Bot Role #####
+  LexBotRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: "2012-10-17"
+        Statement:
+          - Effect: Allow
+            Principal:
+              Service:
+                - lexv2.amazonaws.com
+            Action:
+              - "sts:AssumeRole"
+      Path: "/"
+      Policies:
+        - PolicyName: LexRuntimeRolePolicy
+          PolicyDocument:
+            Version: 2012-10-17
+            Statement:
+              - Effect: Allow
+                Action:
+                  - "polly:SynthesizeSpeech"
+                  - "comprehend:DetectSentiment"
+                Resource: "*"     
+
+  LexInvokeLambdaPermission:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt LexBotLambda.Arn
+      Principal: "lexv2.amazonaws.com"
+      SourceArn: !GetAtt LexBotAlias.Arn
+
+  ### API-GW ###
+  ConnectChatBlogAPICloudWatchRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Statement:
+          - Action: sts:AssumeRole
+            Effect: Allow
+            Principal:
+              Service: apigateway.amazonaws.com
+        Version: "2012-10-17"
+      ManagedPolicyArns:
+        - Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - :iam::aws:policy/service-role/AmazonAPIGatewayPushToCloudWatchLogs
+
+  ConnectChatBlogAPI:
+    Type: AWS::ApiGateway::RestApi
+    Properties:
+      Name: ConnectChatBlogAPI
+      Description: "API to enable Amazon Connect Chat and Lex session integration"
+      EndpointConfiguration:
+        Types:
+          - EDGE
+
+  ConnectChatBlogAPIAccount:
+    Type: AWS::ApiGateway::Account
+    Properties:
+      CloudWatchRoleArn:
+        Fn::GetAtt:
+          - ConnectChatBlogAPICloudWatchRole
+          - Arn
+    DependsOn:
+      - ConnectChatBlogAPI
+
+  ConnectChatBlogAPIDeployment:
+    Type: AWS::ApiGateway::Deployment
+    Properties:
+      RestApiId:
+        Ref: ConnectChatBlogAPI
+      Description: ConnectChatBlog Deployment
+    DependsOn:
+      - ConnectChatBlogAPISession
+      - ConnectChatBlogAPISessionPOST
+      - ConnectChatBlogAPIRootPOST
+
+  ConnectChatBlogAPIDeploymentStageprod:
+    Type: AWS::ApiGateway::Stage
+    Properties:
+      RestApiId:
+        Ref: ConnectChatBlogAPI
+      DeploymentId:
+        Ref: ConnectChatBlogAPIDeployment
+      StageName: prod
+
+  ConnectChatBlogAPIRootPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: 'false'
+      HttpMethod: POST
+      ResourceId:
+        Fn::GetAtt:
+          - ConnectChatBlogAPI
+          - RootResourceId
+      RestApiId:
+        Ref: ConnectChatBlogAPI
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - ":apigateway:"
+              - Ref: AWS::Region
+              - ":lambda:path/2015-03-31/functions/"
+              - !GetAtt InitiateChatLambda.Arn
+              - "/invocations"
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          ResponseModels:
+            application/json: Empty
+        - StatusCode: "500"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          ResponseModels:
+            application/json: Empty
+
+
+  ConnectChatBlogAPIRootOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ResourceId: !GetAtt ConnectChatBlogAPI.RootResourceId
+      RestApiId:
+        Ref: ConnectChatBlogAPI
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: >-
+                'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+              method.response.header.Access-Control-Allow-Methods: '''POST,OPTIONS'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: '200'
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+
+  ConnectChatBlogAPISession:
+    Type: AWS::ApiGateway::Resource
+    Properties:
+      ParentId:
+        Fn::GetAtt:
+          - ConnectChatBlogAPI
+          - RootResourceId
+      PathPart: "session"
+      RestApiId:
+        Ref: ConnectChatBlogAPI
+
+  ConnectChatBlogAPISessionPOST:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ApiKeyRequired: 'false'
+      HttpMethod: POST
+      ResourceId:
+        Ref: ConnectChatBlogAPISession
+      RestApiId:
+        Ref: ConnectChatBlogAPI
+      AuthorizationType: NONE
+      Integration:
+        IntegrationHttpMethod: POST
+        Type: AWS_PROXY
+        Uri:
+          Fn::Join:
+            - ""
+            - - "arn:"
+              - Ref: AWS::Partition
+              - ":apigateway:"
+              - Ref: AWS::Region
+              - ":lambda:path/2015-03-31/functions/"
+              - !GetAtt LexSessionLambda.Arn
+              - "/invocations"
+      MethodResponses:
+        - StatusCode: "200"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          ResponseModels:
+            application/json: Empty
+        - StatusCode: "500"
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Origin: true
+          ResponseModels:
+            application/json: Empty
+
+  ConnectChatBlogAPISessionOptions:
+    Type: AWS::ApiGateway::Method
+    Properties:
+      ResourceId:
+        Ref: ConnectChatBlogAPISession
+      RestApiId: 
+        Ref: ConnectChatBlogAPI
+      AuthorizationType: NONE
+      HttpMethod: OPTIONS
+      Integration:
+        Type: MOCK
+        IntegrationResponses:
+          - ResponseParameters:
+              method.response.header.Access-Control-Allow-Headers: >-
+                'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+              method.response.header.Access-Control-Allow-Methods: '''POST,OPTIONS'''
+              method.response.header.Access-Control-Allow-Origin: '''*'''
+            ResponseTemplates:
+              application/json: ''
+            StatusCode: '200'
+        PassthroughBehavior: NEVER
+        RequestTemplates:
+          application/json: '{"statusCode": 200}'
+      MethodResponses:
+        - ResponseModels:
+            application/json: Empty
+          ResponseParameters:
+            method.response.header.Access-Control-Allow-Headers: true
+            method.response.header.Access-Control-Allow-Methods: true
+            method.response.header.Access-Control-Allow-Origin: true
+          StatusCode: '200'
+  
+  LambdaApiGatewayInvokeRoot:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt InitiateChatLambda.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ConnectChatBlogAPI}/*"
+      
+  LambdaApiGatewayInvokeSession:
+    Type: AWS::Lambda::Permission
+    Properties:
+      Action: "lambda:InvokeFunction"
+      FunctionName: !GetAtt LexSessionLambda.Arn
+      Principal: "apigateway.amazonaws.com"
+      SourceArn: !Sub "arn:aws:execute-api:${AWS::Region}:${AWS::AccountId}:${ConnectChatBlogAPI}/*"
+      
+Outputs:
+  cloudFrontDistribution:
+    Description:  The domain name of the CloudFront Distribution to host the chat website
+    Value: !GetAtt CloudFrontDistribution.DomainName
+  initiateChatLambda:
+    Description:  The Name of the Lambda function created to initiate chat
+    Value: !Ref InitiateChatLambda
+  apiGatewayEndpoint:
+    Description:  The Name of the API Gateway endpoint that triggers the Lambda function to initiate the chat
+    Value: !Ref ConnectChatBlogAPI
+  websiteS3Bucket:
+    Description:  The ARN of the S3 Bucket used to host the website
+    Value: !GetAtt CreateWebsiteS3Bucket.Arn
+  LexBotLambda:
+    Description: Name of the lambda to connect to the Lex bot.
+    Value: !Ref LexBotLambda
+  LexSessionLambda:
+    Description: Name of the lambda to manage session information for the Lex bot.
+    Value: !Ref LexSessionLambda
+  BotName:
+    Description: Name of the Lex Bot
+    Value: !Ref LexBotName
+  BotID:
+    Description:  Bot ID
+    Value: !Ref LexBot
+  BotAliasID:
+    Description:  Bot Alias ID
+    Value: !Select [0, !Split ["|", !Ref LexBotAlias]]
