@@ -1,8 +1,8 @@
-# loan-app-blog
+# Virtual Credit Approval Agent
 
-This project contains source code and supporting files to build a loan application bot you can deploy with the SAM CLI.
+This project contains source code and supporting files to build a virtual credit approval bot you can deploy with the SAM CLI.
 
-The application uses several AWS resources to support the loan approval process. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
+The application uses several AWS resources to support the credit approval process. These resources are defined in the `template.yaml` file in this project. You can update the template to add AWS resources through the same deployment process that updates your application code.
 
 To use the SAM CLI, you need the following tools.
 
@@ -32,9 +32,9 @@ You can find resources in the output values displayed after deployment.
 To delete the sample application that you created, use the AWS CLI. Assuming you used your project name for the stack name, you can run the following:
 
 ```bash
-aws cloudformation delete-stack --stack-name loan-app-blog
+aws cloudformation delete-stack --stack-name virtual-credit-agent
 ```
-
+Note: You may get an error when deleting the website S3 bucket. Manually empty and delete the S3 bucket, then delete the stack in the console.
 ## Security
 
 See [CONTRIBUTING](CONTRIBUTING.md#security-issue-notifications) for more information.
