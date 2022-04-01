@@ -14,7 +14,6 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-import json
 import boto3
 from trp import Document
 
@@ -29,39 +28,39 @@ def evaluate_loan(imagebytes, busi_approval):
         },
         FeatureTypes=["FORMS"])
 
-    #print(response)
+    # print(response)
     doc = Document(response)
 
     for page in doc.pages:
-        #Get field by key
+        # Get field by key
         key = "Social security wages"
         field = page.form.getFieldByKey(key)
-        if(field):
+        if field:
             print("Key: {}, Value: {}".format(field.key, field.value))
     
         # Search fields by key
         fields = page.form.searchFieldsByKey(key)
         for field in fields:
             print("Key: {}, Value: {}".format(field.key, field.value))
-            wages = field.value
             wagesstring = str(field.value)
-            wagesstring = wagesstring.replace(",",'')
+            wagesstring = wagesstring.replace(",", '')
             wagesint = int(float(wagesstring))
-            return makedecision(busi_approval,wagesint)
+            return makedecision(busi_approval, wagesint)
 
-def makedecision (busi_approval, wagesint):
+
+def makedecision(busi_approval, wagesint):
     if (wagesint * .5) > busi_approval:
         creditdecision = "Approved"
-        Message="Congratulations! Your loan is approved. I'll now tranfer you to an agent for help with processing your loan."
+        message = "Congratulations! Your loan is approved. I'll now tranfer you to an agent for help with processing your loan."
         print(creditdecision)
     else:
         creditdecision = "Denied"
-        Message="Your load has been denied. I'll transfer you to an agent for further assistance."
+        message = "Your load has been denied. I'll transfer you to an agent for further assistance."
         print(creditdecision)
 
     return {
         "response": creditdecision,
         "body": {
-              "message": Message,
+              "message": message,
             }
         }

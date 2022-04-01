@@ -16,7 +16,6 @@
 #
 import boto3
 import json
-import os
 import logging
 
 logger = logging.getLogger()
@@ -25,15 +24,16 @@ logger.setLevel(logging.INFO)
 # Initialize boto3 client at global scope
 connectClient = boto3.client('connect')
 
-def startChatContact(body):  
-    contactFlowId=body.get("ContactFlowId", None)
-    instanceId = body.get("InstanceId", None)
-    logger.info('InstanceId: %s, FlowId: %s', instanceId, contactFlowId)
+
+def start_chat_contact(body):
+    contact_flow_id = body.get("ContactFlowId", None)
+    instance_id = body.get("InstanceId", None)
+    logger.info('InstanceId: %s, FlowId: %s', instance_id, contact_flow_id)
 
     try:
-        response=connectClient.start_chat_contact(
-            InstanceId=instanceId,
-            ContactFlowId=contactFlowId,
+        response = connectClient.start_chat_contact(
+            InstanceId=instance_id,
+            ContactFlowId=contact_flow_id,
             Attributes={
                 "customerName": body["ParticipantDetails"]["DisplayName"]
             },
@@ -42,35 +42,37 @@ def startChatContact(body):
             }
         )
         logger.info('start chat contact response: ' + json.dumps(response))
-        return successfulResponse(response)
+        return successful_response(response)
     
     except Exception as e:
         logger.error('start chat contact error: ' + str(e))
-        return errorResponse(str(e))
+        return error_response(str(e))
 
-def successfulResponse(result):
+
+def successful_response(result):
     response = {
         "statusCode": 200,
         "headers": {
             "Access-Control-Allow-Origin": "*",
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Credentials' : True,
-            'Access-Control-Allow-Headers':'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+            'Access-Control-Allow-Credentials': True,
+            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
         },
         "body": json.dumps({
-            "data": { "startChatResult": result }
+            "data": {"startChatResult": result}
         })
     }
     return response
 
-def errorResponse(err):
+
+def error_response(err):
     response = {
         "statusCode": 500,
         "headers": {
             "Access-Control-Allow-Origin": "*",
             'Content-Type': 'application/json',
-            'Access-Control-Allow-Credentials' : True,
-            'Access-Control-Allow-Headers':'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
+            'Access-Control-Allow-Credentials': True,
+            'Access-Control-Allow-Headers': 'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'
         },
         "body": json.dumps({
             "data": {
@@ -80,7 +82,8 @@ def errorResponse(err):
     }
     return response
 
+
 def lambda_handler(event, context):
     logger.info('lambda_handler: chat request event = ' + json.dumps(event))
     body = json.loads(event.get("body"))
-    return startChatContact(body)
+    return start_chat_contact(body)

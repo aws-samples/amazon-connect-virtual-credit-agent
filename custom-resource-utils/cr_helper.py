@@ -1,7 +1,5 @@
 import urllib.request
-import boto3
 import json
-import os
 import logging
 import config_utils as utils
 
@@ -24,10 +22,10 @@ def send_response(event, log_stream_name, response_status, response_data):
     length_of_response = len(data)
     data = bytes(data, 'utf-8')
     url = event['ResponseURL']
-    #Build request    
+    # Build request
     req = urllib.request.Request(url=url, data=data, method='PUT')
     req.add_header("Content-Type", "")
-    req.add_header("Content-Length", length_of_response)
+    req.add_header("Content-Length", str(length_of_response))
     try:
         response = urllib.request.urlopen(req)
     except Exception as e:
@@ -45,7 +43,7 @@ def process_event(event, context):
     logger.info("Request Type: %s", request_type)
     logger.info("Custom Action: %s", custom_action)
 
-    #default status
+    # default status
     response_status = 'FAILED'
     response_data = None    
     
@@ -54,9 +52,9 @@ def process_event(event, context):
         send_response(event, context.log_stream_name, response_status, response_data)
         return
  
-    #Take actions based on request type and custom action
+    # Take actions based on request type and custom action
     if request_type == "Delete":
-        #Disassociate bot on delete
+        # Disassociate bot on delete
         if custom_action == "configureConnectBot":
             logger.info("Disassociate bot from Connect Instance")
             response_status = utils.disassociate_bot(resource_properties)
@@ -66,17 +64,17 @@ def process_event(event, context):
         send_response(event, context.log_stream_name, response_status, response_data)
 
     elif request_type == "Create" or request_type == "Update":
-        #Associate bot on create only
+        # Associate bot on create only
         if custom_action == "configureConnectBot" and request_type == "Create":
             logger.info("Associate bot to Connect Instance")
             response_status = utils.associate_bot(resource_properties)
 
-        #Copy website files
+        # Copy website files
         if custom_action == "configureWebsite":
             logger.info("Copy website files")
             response_status = utils.copy_website_files(resource_properties)
         
-        #Configure index file
+        # Configure index file
         if custom_action == "configureIndexFile":
             logger.info("Configure index file")
             response_status = utils.config_index_file(resource_properties)

@@ -14,33 +14,33 @@
 # OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE
 # SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 #
-import json
 import urllib
-import io
+
 
 # --- Helpers that build all of the responses ---
-def elicit_intent(intent, activeContexts, sessionAttributes, message, requestAttributes):
+def elicit_intent(intent, active_contexts, session_attributes, message, request_attributes):
     return { 
         'messages': [message],
-        'requestAttributes': requestAttributes,
+        'requestAttributes': request_attributes,
         'sessionState': {
-            'activeContexts': activeContexts,
+            'activeContexts': active_contexts,
             'intent': intent,
-            'sessionAttributes': sessionAttributes,
+            'sessionAttributes': session_attributes,
             'dialogAction': {
                 'type': 'ElicitIntent'
             }
         }
     }
-    
-def elicit_slot(intent, activeContexts, sessionAttributes, slot, message, requestAttributes):
+
+
+def elicit_slot(intent, active_contexts, session_attributes, slot, message, request_attributes):
     return { 
         'messages': [message],
-        'requestAttributes': requestAttributes,
+        'requestAttributes': request_attributes,
         'sessionState': {
-            'activeContexts': activeContexts,
+            'activeContexts': active_contexts,
             'intent': intent,
-            'sessionAttributes': sessionAttributes,
+            'sessionAttributes': session_attributes,
             'dialogAction': {
                 'slotToElicit': slot,
                 'type': 'ElicitSlot'
@@ -48,42 +48,45 @@ def elicit_slot(intent, activeContexts, sessionAttributes, slot, message, reques
         }
     }
 
-def close(intent, activeContexts, sessionAttributes, message, requestAttributes):
+
+def close(intent, active_contexts, session_attributes, message, request_attributes):
     return { 
         'messages': [message],
-        'requestAttributes': requestAttributes,
+        'requestAttributes': request_attributes,
         'sessionState': {
-            'activeContexts': activeContexts,
+            'activeContexts': active_contexts,
             'intent': intent,
-            'sessionAttributes': sessionAttributes,
+            'sessionAttributes': session_attributes,
             'dialogAction': {
                 'type': 'Close'
             }
         }
     }
 
-def delegate(intent, activeContexts, sessionAttributes, messages, requestAttributes):
+
+def delegate(intent, active_contexts, session_attributes, messages, request_attributes):
     return { 
         'messages': messages,
-        'requestAttributes': requestAttributes,
+        'requestAttributes': request_attributes,
         'sessionState': {
-            'activeContexts': activeContexts,
+            'activeContexts': active_contexts,
             'intent': intent,
-            'sessionAttributes': sessionAttributes,
+            'sessionAttributes': session_attributes,
             'dialogAction': {
                 'type': 'Delegate'
             }
         }
     }
     
-def confirm_intent(intent, activeContexts, sessionAttributes, message, requestAttributes):
+
+def confirm_intent(intent, active_contexts, session_attributes, message, request_attributes):
     return { 
         'messages': [message],
-        'requestAttributes': requestAttributes,
+        'requestAttributes': request_attributes,
         'sessionState': {
-            'activeContexts': activeContexts,
+            'activeContexts': active_contexts,
             'intent': intent,
-            'sessionAttributes': sessionAttributes,
+            'sessionAttributes': session_attributes,
             'dialogAction': {
                 'type': 'ConfirmIntent'
             }
