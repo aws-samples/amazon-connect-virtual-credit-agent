@@ -43,6 +43,11 @@ Resources:
     Type: 'AWS::S3::Bucket'
     Properties:
       BucketName: !Sub ${WebsiteS3BucketName}-${AWS::AccountId}
+      BucketEncryption:
+        ServerSideEncryptionConfiguration:
+          - ServerSideEncryptionByDefault:
+              SSEAlgorithm: AES256
+            BucketKeyEnabled: true
       AccessControl: LogDeliveryWrite
       LoggingConfiguration:
         DestinationBucketName: !Sub ${WebsiteS3BucketName}-${AWS::AccountId}
