@@ -22,6 +22,7 @@ import utils
 logger = logging.getLogger()
 logger.setLevel(logging.INFO)
 
+
 # Validation handler
 def validate_handler(intent, active_contexts, session_attributes, messages, request_attributes):
     intent_name = intent.get('name', None)
