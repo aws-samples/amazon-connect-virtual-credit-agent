@@ -21,6 +21,11 @@ The first command will build the source of your application. The second command 
 
 * **Stack Name**: The name of the stack to deploy to CloudFormation. This should be unique to your account and region, and a good starting point would be something matching your project name.
 * **AWS Region**: The AWS region you want to deploy your app to. Be sure to use the us-east-1 region for this project.
+* **Parameter WebsiteS3BucketName**: Accept the default name. The deployment will append the AWS acount number to the name to ensure bucket name uniqueness.
+* **Parameter ConnectFlowId**: Replace this with the Contact Flow ID captured for your Connect Flow.
+* **Parameter ConnectInstanceId**: Replace this with the Connect Instance ID captured for your Connect instance.
+* **Parameter cloudFrontPriceClass**: The default pricing class should be fine. See [Amazon CloudFront Pricing](https://aws.amazon.com/cloudfront/pricing/) for details.
+* **Parameter LexBotName**: Accept the default bot name.
 * **Confirm changes before deploy**: If set to yes, any change sets will be shown to you before execution for manual review. If set to no, the AWS SAM CLI will automatically deploy application changes.
 * **Allow SAM CLI IAM role creation**: Many AWS SAM templates, including this example, create AWS IAM roles required for the AWS Lambda function(s) included to access AWS services. By default, these are scoped down to minimum required permissions. To deploy an AWS CloudFormation stack which creates or modified IAM roles, the `CAPABILITY_IAM` value for `capabilities` must be provided. If permission isn't provided through this prompt, to deploy this example you must explicitly pass `--capabilities CAPABILITY_IAM` to the `sam deploy` command.
 * **Save arguments to samconfig.toml**: If set to yes, your choices will be saved to a configuration file inside the project, so that in the future you can just re-run `sam deploy` without parameters to deploy changes to your application.
